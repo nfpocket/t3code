@@ -3,6 +3,7 @@ import {
   ChevronRightIcon,
   FolderIcon,
   GitPullRequestIcon,
+  PanelLeftCloseIcon,
   PlusIcon,
   RocketIcon,
   SettingsIcon,
@@ -78,7 +79,7 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
   SidebarSeparator,
-  SidebarTrigger,
+  useSidebar,
 } from "./ui/sidebar";
 import { useThreadSelectionStore } from "../threadSelectionStore";
 import { formatWorktreePathForDisplay, getOrphanedWorktreePathForThread } from "../worktreeCleanup";
@@ -252,6 +253,7 @@ function SortableProjectItem({
 }
 
 export default function Sidebar() {
+  const { toggleSidebar } = useSidebar();
   const projects = useStore((store) => store.projects);
   const threads = useStore((store) => store.threads);
   const markThreadUnread = useStore((store) => store.markThreadUnread);
@@ -1108,7 +1110,6 @@ export default function Sidebar() {
 
   const wordmark = (
     <div className="flex items-center gap-2">
-      <SidebarTrigger className="shrink-0 md:hidden" />
       <Tooltip>
         <TooltipTrigger
           render={
@@ -1130,12 +1131,35 @@ export default function Sidebar() {
     </div>
   );
 
+  const collapseSidebarButton = (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            className="shrink-0 border border-border/70 bg-background/80 text-muted-foreground hover:bg-accent hover:text-foreground [-webkit-app-region:no-drag]"
+            aria-label="Collapse projects sidebar"
+            size="icon-sm"
+            variant="outline"
+            onClick={() => {
+              toggleSidebar();
+            }}
+          >
+            <PanelLeftCloseIcon className="size-3.5" />
+            <span className="sr-only">Collapse projects sidebar</span>
+          </Button>
+        }
+      />
+      <TooltipPopup side="bottom">Collapse sidebar</TooltipPopup>
+    </Tooltip>
+  );
+
   return (
     <>
       {isElectron ? (
         <>
           <SidebarHeader className="drag-region h-[52px] flex-row items-center gap-2 px-4 py-0 pl-[90px]">
             {wordmark}
+            <div className="ml-auto flex items-center gap-2">{collapseSidebarButton}</div>
             {showDesktopUpdateButton && (
               <Tooltip>
                 <TooltipTrigger
@@ -1145,7 +1169,7 @@ export default function Sidebar() {
                       aria-label={desktopUpdateTooltip}
                       aria-disabled={desktopUpdateButtonDisabled || undefined}
                       disabled={desktopUpdateButtonDisabled}
-                      className={`inline-flex size-7 ml-auto mt-1.5 items-center justify-center rounded-md text-muted-foreground transition-colors ${desktopUpdateButtonInteractivityClasses} ${desktopUpdateButtonClasses}`}
+                      className={`inline-flex size-7 mt-1.5 items-center justify-center rounded-md text-muted-foreground transition-colors [-webkit-app-region:no-drag] ${desktopUpdateButtonInteractivityClasses} ${desktopUpdateButtonClasses}`}
                       onClick={handleDesktopUpdateButtonClick}
                     >
                       <RocketIcon className="size-3.5" />
@@ -1158,8 +1182,9 @@ export default function Sidebar() {
           </SidebarHeader>
         </>
       ) : (
-        <SidebarHeader className="gap-3 px-3 py-2 sm:gap-2.5 sm:px-4 sm:py-3">
+        <SidebarHeader className="flex-row items-center gap-3 px-3 py-2 sm:gap-2.5 sm:px-4 sm:py-3">
           {wordmark}
+          <div className="ml-auto flex items-center gap-2">{collapseSidebarButton}</div>
         </SidebarHeader>
       )}
 

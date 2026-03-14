@@ -6,12 +6,13 @@ import {
 } from "@t3tools/contracts";
 import { memo } from "react";
 import GitActionsControl from "../GitActionsControl";
-import { DiffIcon, GlobeIcon } from "lucide-react";
+import { DiffIcon, GlobeIcon, PanelLeftIcon } from "lucide-react";
 import { Badge } from "../ui/badge";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import ProjectScriptsControl, { type NewProjectScriptInput } from "../ProjectScriptsControl";
+import { Button } from "../ui/button";
 import { Toggle } from "../ui/toggle";
-import { SidebarTrigger } from "../ui/sidebar";
+import { SidebarTrigger, useSidebar } from "../ui/sidebar";
 import { OpenInPicker } from "./OpenInPicker";
 
 interface ChatHeaderProps {
@@ -57,10 +58,34 @@ export const ChatHeader = memo(function ChatHeader({
   onToggleDiff,
   onTogglePreview,
 }: ChatHeaderProps) {
+  const { isMobile, open, toggleSidebar } = useSidebar();
+  const showCollapsedSidebarReveal = !isMobile && !open;
+  const showMobileSidebarTrigger = isMobile;
+
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2">
       <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden sm:gap-3">
-        <SidebarTrigger className="size-7 shrink-0 md:hidden" />
+        {showMobileSidebarTrigger ? <SidebarTrigger className="size-7 shrink-0" /> : null}
+        {showCollapsedSidebarReveal ? (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  className="size-7 shrink-0"
+                  size="icon-sm"
+                  variant="outline"
+                  aria-label="Reveal projects sidebar"
+                  onClick={() => {
+                    toggleSidebar();
+                  }}
+                >
+                  <PanelLeftIcon className="size-3.5" />
+                </Button>
+              }
+            />
+            <TooltipPopup side="bottom">Show projects sidebar</TooltipPopup>
+          </Tooltip>
+        ) : null}
         <h2
           className="min-w-0 shrink truncate text-sm font-medium text-foreground"
           title={activeThreadTitle}

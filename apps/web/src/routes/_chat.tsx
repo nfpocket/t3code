@@ -1,7 +1,7 @@
 import { type ResolvedKeybindingsConfig } from "@t3tools/contracts";
 import { useQuery } from "@tanstack/react-query";
 import { Outlet, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { type CSSProperties, useEffect } from "react";
 
 import ThreadSidebar from "../components/Sidebar";
 import { useHandleNewThread } from "../hooks/useHandleNewThread";
@@ -10,11 +10,15 @@ import { serverConfigQueryOptions } from "../lib/serverReactQuery";
 import { resolveShortcutCommand } from "../keybindings";
 import { selectThreadTerminalState, useTerminalStateStore } from "../terminalStateStore";
 import { useThreadSelectionStore } from "../threadSelectionStore";
-import { Sidebar, SidebarProvider } from "~/components/ui/sidebar";
+import { Sidebar, SidebarProvider, SidebarRail } from "~/components/ui/sidebar";
 import { resolveSidebarNewThreadEnvMode } from "~/components/Sidebar.logic";
 import { useAppSettings } from "~/appSettings";
 
 const EMPTY_KEYBINDINGS: ResolvedKeybindingsConfig = [];
+const CHAT_LEFT_SIDEBAR_WIDTH_STORAGE_KEY = "chat_left_sidebar_width";
+const CHAT_LEFT_SIDEBAR_DEFAULT_WIDTH = "22rem";
+const CHAT_LEFT_SIDEBAR_MIN_WIDTH = 14 * 16;
+const CHAT_LEFT_SIDEBAR_MAX_WIDTH = 34 * 16;
 
 function ChatRouteGlobalShortcuts() {
   const clearSelection = useThreadSelectionStore((state) => state.clearSelection);
@@ -110,14 +114,23 @@ function ChatRouteLayout() {
   }, [navigate]);
 
   return (
-    <SidebarProvider defaultOpen>
+    <SidebarProvider
+      defaultOpen
+      style={{ "--sidebar-width": CHAT_LEFT_SIDEBAR_DEFAULT_WIDTH } as CSSProperties}
+    >
       <ChatRouteGlobalShortcuts />
       <Sidebar
         side="left"
         collapsible="offcanvas"
         className="border-r border-border bg-card text-foreground"
+        resizable={{
+          minWidth: CHAT_LEFT_SIDEBAR_MIN_WIDTH,
+          maxWidth: CHAT_LEFT_SIDEBAR_MAX_WIDTH,
+          storageKey: CHAT_LEFT_SIDEBAR_WIDTH_STORAGE_KEY,
+        }}
       >
         <ThreadSidebar />
+        <SidebarRail />
       </Sidebar>
       <Outlet />
     </SidebarProvider>
