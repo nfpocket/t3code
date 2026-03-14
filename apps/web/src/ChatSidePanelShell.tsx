@@ -3,11 +3,11 @@ import type { ReactNode } from "react";
 import { isElectron } from "~/env";
 import { cn } from "~/lib/utils";
 
-import { Skeleton } from "./ui/skeleton";
+import { Skeleton } from "~/components/ui/skeleton";
 
-export type DiffPanelMode = "inline" | "sheet" | "sidebar";
+export type ChatSidePanelMode = "inline" | "sheet" | "sidebar";
 
-function getDiffPanelHeaderRowClassName(mode: DiffPanelMode) {
+function getSidePanelHeaderRowClassName(mode: ChatSidePanelMode) {
   const shouldUseDragRegion = isElectron && mode !== "sheet";
   return cn(
     "flex items-center justify-between gap-2 px-4",
@@ -15,8 +15,8 @@ function getDiffPanelHeaderRowClassName(mode: DiffPanelMode) {
   );
 }
 
-export function DiffPanelShell(props: {
-  mode: DiffPanelMode;
+export function ChatSidePanelShell(props: {
+  mode: ChatSidePanelMode;
   header: ReactNode;
   children: ReactNode;
 }) {
@@ -32,10 +32,10 @@ export function DiffPanelShell(props: {
       )}
     >
       {shouldUseDragRegion ? (
-        <div className={getDiffPanelHeaderRowClassName(props.mode)}>{props.header}</div>
+        <div className={getSidePanelHeaderRowClassName(props.mode)}>{props.header}</div>
       ) : (
         <div className="border-b border-border">
-          <div className={getDiffPanelHeaderRowClassName(props.mode)}>{props.header}</div>
+          <div className={getSidePanelHeaderRowClassName(props.mode)}>{props.header}</div>
         </div>
       )}
       {props.children}
@@ -43,17 +43,11 @@ export function DiffPanelShell(props: {
   );
 }
 
-export function DiffPanelHeaderSkeleton() {
+export function ChatSidePanelHeaderSkeleton() {
   return (
     <>
       <div className="relative min-w-0 flex-1">
-        <Skeleton className="absolute left-0 top-1/2 size-6 -translate-y-1/2 rounded-md border border-border/50" />
-        <Skeleton className="absolute right-0 top-1/2 size-6 -translate-y-1/2 rounded-md border border-border/50" />
-        <div className="flex gap-1 overflow-hidden px-8 py-0.5">
-          <Skeleton className="h-6 w-16 shrink-0 rounded-md" />
-          <Skeleton className="h-6 w-24 shrink-0 rounded-md" />
-          <Skeleton className="h-6 w-24 shrink-0 rounded-md max-sm:hidden" />
-        </div>
+        <Skeleton className="h-6 w-32 rounded-md" />
       </div>
       <div className="flex shrink-0 gap-1">
         <Skeleton className="size-7 rounded-md" />
@@ -63,7 +57,7 @@ export function DiffPanelHeaderSkeleton() {
   );
 }
 
-export function DiffPanelLoadingState(props: { label: string }) {
+export function ChatSidePanelLoadingState(props: { label: string }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col p-2">
       <div

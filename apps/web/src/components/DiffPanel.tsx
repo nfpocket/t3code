@@ -18,7 +18,7 @@ import { checkpointDiffQueryOptions } from "~/lib/providerReactQuery";
 import { cn } from "~/lib/utils";
 import { readNativeApi } from "../nativeApi";
 import { resolvePathLinkTarget } from "../terminal-links";
-import { parseDiffRouteSearch, stripDiffSearchParams } from "../diffRouteSearch";
+import { parseChatPanelRouteSearch, stripChatPanelSearchParams } from "../chatPanelRouteSearch";
 import { useTheme } from "../hooks/useTheme";
 import { buildPatchCacheKey } from "../lib/diffRendering";
 import { resolveDiffThemeName } from "../lib/diffRendering";
@@ -26,7 +26,11 @@ import { useTurnDiffSummaries } from "../hooks/useTurnDiffSummaries";
 import { useStore } from "../store";
 import { useAppSettings } from "../appSettings";
 import { formatShortTimestamp } from "../timestampFormat";
-import { DiffPanelLoadingState, DiffPanelShell, type DiffPanelMode } from "./DiffPanelShell";
+import {
+  ChatSidePanelLoadingState,
+  ChatSidePanelShell,
+  type ChatSidePanelMode,
+} from "../ChatSidePanelShell";
 import { ToggleGroup, Toggle } from "./ui/toggle-group";
 
 type DiffRenderMode = "stacked" | "split";
@@ -152,7 +156,7 @@ function buildFileDiffRenderKey(fileDiff: FileDiffMetadata): string {
 }
 
 interface DiffPanelProps {
-  mode?: DiffPanelMode;
+  mode?: ChatSidePanelMode;
 }
 
 export { DiffWorkerPoolProvider } from "./DiffWorkerPoolProvider";
@@ -170,7 +174,10 @@ export default function DiffPanel({ mode = "inline" }: DiffPanelProps) {
     strict: false,
     select: (params) => (params.threadId ? ThreadId.makeUnsafe(params.threadId) : null),
   });
-  const diffSearch = useSearch({ strict: false, select: (search) => parseDiffRouteSearch(search) });
+  const diffSearch = useSearch({
+    strict: false,
+    select: (search) => parseChatPanelRouteSearch(search),
+  });
   const activeThreadId = routeThreadId;
   const activeThread = useStore((store) =>
     activeThreadId ? store.threads.find((thread) => thread.id === activeThreadId) : undefined,
@@ -321,8 +328,15 @@ export default function DiffPanel({ mode = "inline" }: DiffPanelProps) {
       to: "/$threadId",
       params: { threadId: activeThread.id },
       search: (previous) => {
-        const rest = stripDiffSearchParams(previous);
-        return { ...rest, diff: "1", diffTurnId: turnId };
+        const rest = stripChatPanelSearchParams(previous);
+        return {
+          ...rest,
+          diff: "1",
+          diffTurnId: turnId,
+          diffFilePath: undefined,
+          preview: undefined,
+          previewUrl: undefined,
+        };
       },
     });
   };
@@ -332,8 +346,15 @@ export default function DiffPanel({ mode = "inline" }: DiffPanelProps) {
       to: "/$threadId",
       params: { threadId: activeThread.id },
       search: (previous) => {
-        const rest = stripDiffSearchParams(previous);
-        return { ...rest, diff: "1" };
+        const rest = stripChatPanelSearchParams(previous);
+        return {
+          ...rest,
+          diff: "1",
+          diffTurnId: undefined,
+          diffFilePath: undefined,
+          preview: undefined,
+          previewUrl: undefined,
+        };
       },
     });
   };
@@ -513,7 +534,7 @@ export default function DiffPanel({ mode = "inline" }: DiffPanelProps) {
   );
 
   return (
-    <DiffPanelShell mode={mode} header={headerRow}>
+    <ChatSidePanelShell mode={mode} header={headerRow}>
       {!activeThread ? (
         <div className="flex flex-1 items-center justify-center px-5 text-center text-xs text-muted-foreground/70">
           Select a thread to inspect turn diffs.
@@ -539,7 +560,7 @@ export default function DiffPanel({ mode = "inline" }: DiffPanelProps) {
             )}
             {!renderablePatch ? (
               isLoadingCheckpointDiff ? (
-                <DiffPanelLoadingState label="Loading checkpoint diff..." />
+                <ChatSidePanelLoadingState label="Loading checkpoint diff..." />
               ) : (
                 <div className="flex h-full items-center justify-center px-3 py-2 text-xs text-muted-foreground/70">
                   <p>
@@ -604,6 +625,6 @@ export default function DiffPanel({ mode = "inline" }: DiffPanelProps) {
           </div>
         </>
       )}
-    </DiffPanelShell>
+    </ChatSidePanelShell>
   );
 }

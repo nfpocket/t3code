@@ -32,6 +32,7 @@ const PROJECT_ID = "project-1" as ProjectId;
 const NOW_ISO = "2026-03-04T12:00:00.000Z";
 const BASE_TIME_MS = Date.parse(NOW_ISO);
 const ATTACHMENT_SVG = "<svg xmlns='http://www.w3.org/2000/svg' width='120' height='300'></svg>";
+const PREVIEW_FRAME_PATH = "/__preview-test";
 
 interface WsRequestEnvelope {
   id: string;
@@ -62,6 +63,13 @@ interface ViewportSpec {
 const DEFAULT_VIEWPORT: ViewportSpec = {
   name: "desktop",
   width: 960,
+  height: 1_100,
+  textTolerancePx: 44,
+  attachmentTolerancePx: 56,
+};
+const WIDE_DESKTOP_VIEWPORT: ViewportSpec = {
+  name: "wide-desktop",
+  width: 1_440,
   height: 1_100,
   textTolerancePx: 44,
   attachmentTolerancePx: 56,
@@ -452,6 +460,13 @@ const worker = setupWorker(
       },
     }),
   ),
+  http.get(`*${PREVIEW_FRAME_PATH}`, () =>
+    HttpResponse.text("<!doctype html><html><body>preview frame</body></html>", {
+      headers: {
+        "Content-Type": "text/html",
+      },
+    }),
+  ),
   http.get("*/api/project-favicon", () => new HttpResponse(null, { status: 204 })),
 );
 
@@ -541,6 +556,31 @@ async function waitForInteractionModeButton(
       ) as HTMLButtonElement | null,
     `Unable to find ${expectedLabel} interaction mode button.`,
   );
+}
+
+function previewTestUrl(path = PREVIEW_FRAME_PATH): string {
+  return new URL(path, window.location.origin).href;
+}
+
+async function waitForHeaderButton(ariaLabel: string): Promise<HTMLButtonElement> {
+  return waitForElement(
+    () => document.querySelector<HTMLButtonElement>(`button[aria-label="${ariaLabel}"]`),
+    `Unable to find header button '${ariaLabel}'.`,
+  );
+}
+
+async function waitForPreviewFrame(): Promise<HTMLIFrameElement> {
+  return waitForElement(
+    () => document.querySelector<HTMLIFrameElement>('[data-browser-preview-frame="true"]'),
+    "Unable to find browser preview iframe.",
+  );
+}
+
+function isActuallyVisible(element: Element | null): boolean {
+  if (!(element instanceof HTMLElement)) {
+    return false;
+  }
+  return element.getClientRects().length > 0;
 }
 
 async function waitForImagesToLoad(scope: ParentNode): Promise<void> {
@@ -1245,6 +1285,231 @@ describe("ChatView timeline estimator parity (full app)", () => {
       );
     } finally {
       await mounted.cleanup();
+    }
+  });
+
+  it("opens the browser preview panel from the header and shows the empty state", async () => {
+    const mounted = await mountChatView({
+      viewport: DEFAULT_VIEWPORT,
+      snapshot: createSnapshotForTargetUser({
+        targetMessageId: "msg-user-preview-toggle" as MessageId,
+        targetText: "preview toggle test",
+      }),
+    });
+
+    try {
+      const previewToggle = await waitForHeaderButton("Toggle browser preview");
+      previewToggle.click();
+
+      await vi.waitFor(
+        () => {
+          expect(
+            isActuallyVisible(document.querySelector('[data-browser-preview-empty="true"]')),
+          ).toBe(true);
+        },
+        { timeout: 8_000, interval: 16 },
+      );
+    } finally {
+      await mounted.cleanup();
+    }
+  });
+
+  it("loads a valid preview URL into the iframe and preserves it across reload", async () => {
+    const mounted = await mountChatView({
+      viewport: DEFAULT_VIEWPORT,
+      snapshot: createSnapshotForTargetUser({
+        targetMessageId: "msg-user-preview-load" as MessageId,
+        targetText: "preview load test",
+      }),
+    });
+
+    try {
+      const previewToggle = await waitForHeaderButton("Toggle browser preview");
+      previewToggle.click();
+
+      await expect
+        .element(page.getByRole("textbox", { name: "Browser preview URL" }))
+        .toBeVisible();
+      await page.getByRole("textbox", { name: "Browser preview URL" }).fill(previewTestUrl());
+      await page.getByRole("button", { name: "Load", exact: true }).click();
+
+      const initialFrame = await waitForPreviewFrame();
+      await vi.waitFor(
+        () => {
+          expect(initialFrame.src).toBe(previewTestUrl());
+        },
+        { timeout: 8_000, interval: 16 },
+      );
+
+      const reloadButton = await waitForHeaderButton("Reload browser preview");
+      reloadButton.click();
+
+      await vi.waitFor(
+        () => {
+          const reloadedFrame = document.querySelector<HTMLIFrameElement>(
+            '[data-browser-preview-frame="true"]',
+          );
+          expect(reloadedFrame).toBeTruthy();
+          expect(reloadedFrame).not.toBe(initialFrame);
+          expect(reloadedFrame?.src).toBe(previewTestUrl());
+        },
+        { timeout: 8_000, interval: 16 },
+      );
+    } finally {
+      await mounted.cleanup();
+    }
+  });
+
+  it("shows validation for invalid preview URLs and keeps the committed preview intact", async () => {
+    const mounted = await mountChatView({
+      viewport: DEFAULT_VIEWPORT,
+      snapshot: createSnapshotForTargetUser({
+        targetMessageId: "msg-user-preview-validation" as MessageId,
+        targetText: "preview validation test",
+      }),
+    });
+
+    try {
+      const previewToggle = await waitForHeaderButton("Toggle browser preview");
+      previewToggle.click();
+
+      await expect
+        .element(page.getByRole("textbox", { name: "Browser preview URL" }))
+        .toBeVisible();
+      await page.getByRole("textbox", { name: "Browser preview URL" }).fill(previewTestUrl());
+      await page.getByRole("button", { name: "Load", exact: true }).click();
+
+      const loadedFrame = await waitForPreviewFrame();
+      await vi.waitFor(
+        () => {
+          expect(loadedFrame.src).toBe(previewTestUrl());
+        },
+        { timeout: 8_000, interval: 16 },
+      );
+
+      await page.getByRole("textbox", { name: "Browser preview URL" }).fill("not a valid url");
+      await page.getByRole("button", { name: "Load", exact: true }).click();
+
+      await vi.waitFor(
+        () => {
+          expect(document.body.textContent).toContain("Enter an absolute http:// or https:// URL.");
+        },
+        { timeout: 8_000, interval: 16 },
+      );
+
+      const currentFrame = await waitForPreviewFrame();
+      expect(currentFrame.src).toBe(previewTestUrl());
+    } finally {
+      await mounted.cleanup();
+    }
+  });
+
+  it("keeps preview and diff mutually exclusive", async () => {
+    const mounted = await mountChatView({
+      viewport: DEFAULT_VIEWPORT,
+      snapshot: createSnapshotForTargetUser({
+        targetMessageId: "msg-user-preview-exclusive" as MessageId,
+        targetText: "preview exclusivity test",
+      }),
+    });
+
+    try {
+      const previewToggle = await waitForHeaderButton("Toggle browser preview");
+      previewToggle.click();
+
+      await vi.waitFor(
+        () => {
+          expect(
+            isActuallyVisible(document.querySelector('[data-browser-preview-empty="true"]')),
+          ).toBe(true);
+        },
+        { timeout: 8_000, interval: 16 },
+      );
+
+      const diffToggle = await waitForHeaderButton("Toggle diff panel");
+      diffToggle.click();
+
+      await vi.waitFor(
+        () => {
+          expect(
+            isActuallyVisible(document.querySelector('button[aria-label="Stacked diff view"]')),
+          ).toBe(true);
+          expect(
+            isActuallyVisible(document.querySelector('[data-browser-preview-panel="true"]')),
+          ).toBe(false);
+        },
+        { timeout: 8_000, interval: 16 },
+      );
+
+      previewToggle.click();
+
+      await vi.waitFor(
+        () => {
+          expect(
+            isActuallyVisible(document.querySelector('[data-browser-preview-panel="true"]')),
+          ).toBe(true);
+          expect(
+            isActuallyVisible(document.querySelector('button[aria-label="Stacked diff view"]')),
+          ).toBe(false);
+        },
+        { timeout: 8_000, interval: 16 },
+      );
+    } finally {
+      await mounted.cleanup();
+    }
+  });
+
+  it("uses the sidebar on desktop and the sheet on mobile for browser preview", async () => {
+    const desktopMounted = await mountChatView({
+      viewport: WIDE_DESKTOP_VIEWPORT,
+      snapshot: createSnapshotForTargetUser({
+        targetMessageId: "msg-user-preview-desktop-mode" as MessageId,
+        targetText: "preview desktop mode",
+      }),
+    });
+
+    try {
+      const previewToggle = await waitForHeaderButton("Toggle browser preview");
+      previewToggle.click();
+
+      await vi.waitFor(
+        () => {
+          expect(
+            isActuallyVisible(document.querySelector('[data-browser-preview-panel="true"]')),
+          ).toBe(true);
+          expect(isActuallyVisible(document.querySelector('[data-slot="sheet-popup"]'))).toBe(
+            false,
+          );
+        },
+        { timeout: 8_000, interval: 16 },
+      );
+    } finally {
+      await desktopMounted.cleanup();
+    }
+
+    const mobileMounted = await mountChatView({
+      viewport: TEXT_VIEWPORT_MATRIX[2],
+      snapshot: createSnapshotForTargetUser({
+        targetMessageId: "msg-user-preview-mobile-mode" as MessageId,
+        targetText: "preview mobile mode",
+      }),
+    });
+
+    try {
+      const previewToggle = await waitForHeaderButton("Toggle browser preview");
+      previewToggle.click();
+
+      await vi.waitFor(
+        () => {
+          expect(isActuallyVisible(document.querySelector('[data-slot="sheet-popup"]'))).toBe(true);
+          expect(
+            isActuallyVisible(document.querySelector('[data-browser-preview-panel="true"]')),
+          ).toBe(true);
+        },
+        { timeout: 8_000, interval: 16 },
+      );
+    } finally {
+      await mobileMounted.cleanup();
     }
   });
 });

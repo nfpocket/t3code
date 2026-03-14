@@ -36,7 +36,7 @@ import { gitBranchesQueryOptions, gitCreateWorktreeMutationOptions } from "~/lib
 import { projectSearchEntriesQueryOptions } from "~/lib/projectReactQuery";
 import { serverConfigQueryOptions, serverQueryKeys } from "~/lib/serverReactQuery";
 import { isElectron } from "../env";
-import { parseDiffRouteSearch, stripDiffSearchParams } from "../diffRouteSearch";
+import { parseChatPanelRouteSearch, stripChatPanelSearchParams } from "../chatPanelRouteSearch";
 import {
   clampCollapsedComposerCursor,
   type ComposerTrigger,
@@ -201,7 +201,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
   const navigate = useNavigate();
   const rawSearch = useSearch({
     strict: false,
-    select: (params) => parseDiffRouteSearch(params),
+    select: (params) => parseChatPanelRouteSearch(params),
   });
   const { resolvedTheme } = useTheme();
   const queryClient = useQueryClient();
@@ -380,6 +380,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
   const isLocalDraftThread = !isServerThread && localDraftThread !== undefined;
   const canCheckoutPullRequestIntoThread = isLocalDraftThread;
   const diffOpen = rawSearch.diff === "1";
+  const previewOpen = rawSearch.preview === "1";
   const activeThreadId = activeThread?.id ?? null;
   const activeLatestTurn = activeThread?.latestTurn ?? null;
   const latestTurnSettled = isLatestTurnSettled(activeLatestTurn, activeThread?.session ?? null);
@@ -1043,11 +1044,54 @@ export default function ChatView({ threadId }: ChatViewProps) {
       params: { threadId },
       replace: true,
       search: (previous) => {
-        const rest = stripDiffSearchParams(previous);
-        return diffOpen ? { ...rest, diff: undefined } : { ...rest, diff: "1" };
+        const rest = stripChatPanelSearchParams(previous);
+        return diffOpen
+          ? {
+              ...rest,
+              diff: undefined,
+              diffTurnId: undefined,
+              diffFilePath: undefined,
+              preview: undefined,
+              previewUrl: undefined,
+            }
+          : {
+              ...rest,
+              diff: "1",
+              diffTurnId: undefined,
+              diffFilePath: undefined,
+              preview: undefined,
+              previewUrl: undefined,
+            };
       },
     });
   }, [diffOpen, navigate, threadId]);
+  const onTogglePreview = useCallback(() => {
+    void navigate({
+      to: "/$threadId",
+      params: { threadId },
+      replace: true,
+      search: (previous) => {
+        const rest = stripChatPanelSearchParams(previous);
+        return previewOpen
+          ? {
+              ...rest,
+              diff: undefined,
+              diffTurnId: undefined,
+              diffFilePath: undefined,
+              preview: undefined,
+              previewUrl: undefined,
+            }
+          : {
+              ...rest,
+              diff: undefined,
+              diffTurnId: undefined,
+              diffFilePath: undefined,
+              preview: "1",
+              previewUrl: undefined,
+            };
+      },
+    });
+  }, [navigate, previewOpen, threadId]);
 
   const envLocked = Boolean(
     activeThread &&
@@ -3172,10 +3216,24 @@ export default function ChatView({ threadId }: ChatViewProps) {
         to: "/$threadId",
         params: { threadId },
         search: (previous) => {
-          const rest = stripDiffSearchParams(previous);
+          const rest = stripChatPanelSearchParams(previous);
           return filePath
-            ? { ...rest, diff: "1", diffTurnId: turnId, diffFilePath: filePath }
-            : { ...rest, diff: "1", diffTurnId: turnId };
+            ? {
+                ...rest,
+                diff: "1",
+                diffTurnId: turnId,
+                diffFilePath: filePath,
+                preview: undefined,
+                previewUrl: undefined,
+              }
+            : {
+                ...rest,
+                diff: "1",
+                diffTurnId: turnId,
+                diffFilePath: undefined,
+                preview: undefined,
+                previewUrl: undefined,
+              };
         },
       });
     },
@@ -3239,6 +3297,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
           diffToggleShortcutLabel={diffPanelShortcutLabel}
           gitCwd={gitCwd}
           diffOpen={diffOpen}
+          previewOpen={previewOpen}
           onRunProjectScript={(script) => {
             void runProjectScript(script);
           }}
@@ -3246,6 +3305,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
           onUpdateProjectScript={updateProjectScript}
           onDeleteProjectScript={deleteProjectScript}
           onToggleDiff={onToggleDiff}
+          onTogglePreview={onTogglePreview}
         />
       </header>
 
